@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocOps | Monitor DevOps</title>
+    <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
+    <style>
+        :root {
+            --bg: #09090b;
+            --card: #18181b;
+            --border: #27272a;
+            --text: #f4f4f5;
+            --text-muted: #a1a1aa;
+            --accent: #3b82f6;
+            --online: #10b981;
+            --offline: #ef4444;
+            --font-mono: ui-monospace, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: ui-sans-serif, system-ui;
+            padding: 30px;
+            margin: 0;
+        }
+
+        .header-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .header-title h1 {
+            margin: 0;
+            font-size: 1.6rem;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo {
+            height: 32px;
+            width: auto;
+        }
+
+        .top-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 40px;
+        }
+
+        .stat-box {
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 15px;
+            border-radius: 8px;
+            position: relative;
+        }
+
+        .stat-lbl {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .stat-val {
+            font-size: 1.6rem;
+            font-weight: bold;
+            font-family: var(--font-mono);
+            color: #fff;
+        }
+
+        .stat-sub {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 5px;
+        }
+
+        canvas.graph {
+            width: 100%;
+            height: 40px;
+            margin-top: 10px;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .project {
+            margin-bottom: 40px;
+            background: rgba(24, 24, 27, 0.4);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .p-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+            border-bottom: 1px dashed var(--border);
+            padding-bottom: 15px;
+        }
+
+        .p-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #fff;
+            margin: 0;
+        }
+
+        .p-stats {
+            display: flex;
+            gap: 10px;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+
+        .p-badge {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #93c5fd;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .group-title {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: bold;
+            margin: 20px 0 10px 0;
+            letter-spacing: 1px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            transition: opacity 0.3s;
+        }
+
+        .card.offline {
+            opacity: 0.6;
+        }
+
+        .c-head {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .c-name {
+            font-weight: bold;
+            font-size: 1.05rem;
+            color: var(--accent);
+        }
+
+        .c-img {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .tag {
+            font-size: 0.7rem;
+            font-family: var(--font-mono);
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tag.domain {
+            color: #2dd4bf;
+            border-color: rgba(45, 212, 191, 0.3);
+        }
+
+        .c-foot {
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px solid var(--border);
+            padding-top: 10px;
+            margin-top: auto;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+
+        .btn-logout {
+            background: transparent;
+            border: 1px solid var(--offline);
+            color: var(--offline);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 0.8rem;
+        }
+
+        .btn-logout:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header-title">
+        <h1><img src="/assets/logo.png" alt="" class="logo" onerror="this.style.display='none'"> DocOps</h1>
+        <div><a href="/api/logout" class="btn-logout">Encerrar Sessão</a></div>
+    </div>
+
+    <div class="top-bar" id="host-stats"></div>
+    <div id="projects-root"></div>
+
+    <script>
+        const fBytes = (b) => { if (!+b) return '0 B'; const k = 1024, i = Math.floor(Math.log(b) / Math.log(k)); return `${parseFloat((b / Math.pow(k, i)).toFixed(1))} ${['B', 'KB', 'MB', 'GB', 'TB'][i]}`; };
+
+        const draw = (id, data, color) => {
+            const c = document.getElementById(id); if (!c) return;
+            const ctx = c.getContext('2d'), w = c.width, h = c.height, m = Math.max(...data, 1), s = w / Math.max((data.length - 1), 1);
+            ctx.clearRect(0, 0, w, h);
+            ctx.beginPath(); ctx.moveTo(0, h);
+            data.forEach((v, i) => ctx.lineTo(i * s, h - ((v / m) * h)));
+            ctx.lineTo(w, h); ctx.fillStyle = color + '33'; ctx.fill();
+            ctx.beginPath();
+            data.forEach((v, i) => { i === 0 ? ctx.moveTo(i * s, h - ((v / m) * h)) : ctx.lineTo(i * s, h - ((v / m) * h)); });
+            ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+        };
+
+        const update = async () => {
+            try {
+                const res = await fetch('/api/data');
+                if (res.status === 401) { window.location.href = '/login.html'; return; }
+
+                const d = await res.json(), h = d.host, n = d.network;
+
+                document.getElementById('host-stats').innerHTML = `
+                    <div class="stat-box"><div class="stat-lbl">RAM do Servidor</div><div class="stat-val">${h.ram_pct}%</div><div class="stat-sub">${fBytes(h.ram_used)} / ${fBytes(h.ram_tot)}</div></div>
+                    <div class="stat-box"><div class="stat-lbl">Armazenamento</div><div class="stat-val">${h.disk_pct}%</div><div class="stat-sub">${fBytes(h.disk_used)} / ${fBytes(h.disk_tot)}</div></div>
+                    <div class="stat-box"><div class="stat-lbl">CPU & Disk I/O</div><div class="stat-val">${h.cpu_pct}%</div><div class="stat-sub">I/O Load: ${h.io_pct}%</div></div>
+                    <div class="stat-box"><div class="stat-lbl">Download</div><div class="stat-val">${n.rx_mbps} MB/s</div><canvas id="grx" width="200" height="40" class="graph"></canvas></div>
+                    <div class="stat-box"><div class="stat-lbl">Upload</div><div class="stat-val">${n.tx_mbps} MB/s</div><canvas id="gtx" width="200" height="40" class="graph"></canvas></div>
+                `;
+
+                // O front desenha o gráfico lendo diretamente o histórico guardado na memória do Backend
+                draw('grx', n.history_rx, '#3b82f6');
+                draw('gtx', n.history_tx, '#10b981');
+
+                let phtml = '';
+                for (const [pn, p] of Object.entries(d.projects)) {
+                    if (!p.banco.length && !p.front.length && !p.back.length) continue;
+                    phtml += `<div class="project"><div class="p-header"><h2 class="p-title">📦 ${pn}</h2><div class="p-stats"><span class="p-badge">⚡ ${p.stats.cpu.toFixed(1)}%</span><span class="p-badge">🧠 ${fBytes(p.stats.ram)}</span><span class="p-badge">💾 ${fBytes(p.stats.io_rw)}</span><span class="p-badge">🌐 ${fBytes(p.stats.net_rx)} ↓</span></div></div>`;
+                    const rG = (t, items) => {
+                        if (!items.length) return ''; let g = `<div class="group-title">${t}</div><div class="grid">`;
+                        items.sort((a, b) => a.name.localeCompare(b.name)).forEach(c => {
+                            const u = c.state === 'running';
+                            let tg = c.domains.map(d => `<span class="tag domain">🔗 ${d}</span>`).join('') + c.ports.map(p => `<span class="tag">🔌 ${p}</span>`).join('');
+                            g += `<div class="card ${u ? '' : 'offline'}"><div class="c-head"><div class="c-name">${c.name}</div><div style="color:${u ? 'var(--online)' : 'var(--offline)'}; font-size:0.7rem; font-weight:bold;">${c.state.toUpperCase()}</div></div><div class="c-img" title="${c.image}">${c.image}</div>${tg ? `<div class="tag-list">${tg}</div>` : ''}<div class="c-foot"><span>CPU: ${u ? c.cpu + '%' : '0%'}</span><span>RAM: ${u ? fBytes(c.ram) : '0 B'}</span></div></div>`;
+                        }); return g + `</div>`;
+                    };
+                    phtml += rG('🗄️ Bancos de Dados', p.banco) + rG('🚀 Frontend & Proxies', p.front) + rG('🔒 Backend & APIs', p.back) + `</div>`;
+                }
+                document.getElementById('projects-root').innerHTML = phtml;
+            } catch (e) { }
+        };
+        setInterval(update, 2000); update();
+    </script>
+</body>
+
+</html>

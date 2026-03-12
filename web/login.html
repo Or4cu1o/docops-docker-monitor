@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>DocOps | Security Access</title>
+    <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
+    <style>
+        body {
+            background: #09090b;
+            color: #f4f4f5;
+            font-family: ui-sans-serif, system-ui;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .box {
+            background: #18181b;
+            border: 1px solid #27272a;
+            padding: 40px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 360px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .logo {
+            max-width: 80px;
+            margin-bottom: 20px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            background: #09090b;
+            border: 1px solid #3f3f46;
+            color: white;
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 15px;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="box">
+        <img src="/assets/logo.png" alt="DocOps Logo" class="logo" onerror="this.style.display='none'">
+        <h2>🐋 DocOps Login</h2>
+        <p style="color:#a1a1aa; font-size:0.9rem; margin-bottom:30px;">Autenticação Requerida</p>
+        <form method="POST" action="/api/login">
+            <input type="text" name="user" placeholder="Usuário" required>
+            <input type="password" name="pass" placeholder="Senha" required>
+            <button type="submit">Autenticar Sistema</button>
+        </form>
+    </div>
+</body>
+
+</html>
