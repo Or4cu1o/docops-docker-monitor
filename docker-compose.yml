@@ -1,0 +1,18 @@
+name: docops-monitor
+services:
+  docops:
+    build: .
+    image: or4cu1o/docops:latest
+    container_name: docops
+    ports:
+      - "8000:8000"
+    environment:
+      - DOCOPS_USER=admin
+      - DOCOPS_PASS=senha_segura_123
+    volumes:
+      # Montagens estritas em modo Read-Only (ro) para total inviolabilidade do Host
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro
+    restart: unless-stopped
