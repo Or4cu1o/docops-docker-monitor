@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 120">
+    <g id="logo-mark">
+        <!-- Silhueta da Baleia em Curva Contínua -->
+        <path d="M 130 70 C 130 100 100 105 80 105 C 60 105 40 95 30 80 C 25 80 15 90 10 90 C 15 80 15 70 10 60 C 15 60 25 70 30 70 C 40 55 60 45 80 45 C 110 45 130 50 130 70 Z" fill="none" stroke="#3b82f6" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+        
+        <!-- Olho -->
+        <circle cx="105" cy="65" r="4" fill="#3b82f6"/>
+        
+        <!-- Monitoramento de Rede (Grafo Interno) -->
+        <path d="M 40 85 L 55 70 L 75 75 L 95 55" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        
+        <!-- Nós de Rede -->
+        <circle cx="55" cy="70" r="3.5" fill="transparent" stroke="#3b82f6" stroke-width="2.5"/>
+        <circle cx="75" cy="75" r="3.5" fill="transparent" stroke="#3b82f6" stroke-width="2.5"/>
+        <circle cx="95" cy="55" r="3.5" fill="transparent" stroke="#3b82f6" stroke-width="2.5"/>
+
+        <!-- Radar Base/Espiráculo -->
+        <circle cx="80" cy="45" r="3" fill="#3b82f6"/>
+        
+        <!-- Ondas de Radar Geométricas -->
+        <path d="M 65 30 C 75 20 85 20 95 30" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round"/>
+        <path d="M 55 15 C 70 0 90 0 105 15" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round"/>
+    </g>
+
+    <!-- Tipografia -->
+    <text x="155" y="85" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="68" font-weight="800" fill="#a1a1aa" letter-spacing="-1.5">DocOps</text>
+</svg>
