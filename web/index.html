@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DocOps | Monitor DevOps</title>
-    <link rel="icon" type="image/x-icon" href="/assets/favicon.png">
+    <link rel="icon" type="image/png" href="/assets/favicon.png">
     <style>
         :root {
             --bg: #09090b;
@@ -66,6 +66,26 @@
             padding: 15px;
             border-radius: 8px;
             position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 110px;
+        }
+
+        .stat-box>div {
+            position: relative;
+            z-index: 2;
+        }
+
+        canvas.bg-graph {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 60%;
+            z-index: 1;
+            opacity: 0.25;
+            pointer-events: none;
         }
 
         .stat-lbl {
@@ -86,15 +106,33 @@
         .stat-sub {
             font-size: 0.8rem;
             color: var(--text-muted);
-            margin-top: 5px;
+            margin-top: auto;
+            padding-top: 5px;
         }
 
-        canvas.graph {
-            width: 100%;
-            height: 40px;
-            margin-top: 10px;
-            border-radius: 4px;
-            background: rgba(0, 0, 0, 0.2);
+        .status-dot {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            z-index: 3;
+        }
+
+        .dot-green {
+            background: var(--online);
+            box-shadow: 0 0 8px var(--online);
+        }
+
+        .dot-yellow {
+            background: #f59e0b;
+            box-shadow: 0 0 8px #f59e0b;
+        }
+
+        .dot-red {
+            background: var(--offline);
+            box-shadow: 0 0 8px var(--offline);
         }
 
         .project {
@@ -170,7 +208,7 @@
         .c-head {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 10px;
+            margin-bottom: 5px;
         }
 
         .c-name {
@@ -204,9 +242,15 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
-        .tag.domain {
+        a.tag.domain {
             color: #2dd4bf;
             border-color: rgba(45, 212, 191, 0.3);
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+
+        a.tag.domain:hover {
+            background: rgba(45, 212, 191, 0.1);
         }
 
         .c-foot {
@@ -238,7 +282,13 @@
 
 <body>
     <div class="header-title">
-        <h1><img src="/assets/logo.png" alt="" class="logo" onerror="this.style.display='none'"> DocOps</h1>
+        <h1>
+            <img src="/assets/logo.svg" alt="DocOps" class="logo"
+                onerror="this.onerror=null; this.src='/assets/logo.png'"> DocOps
+            <div id="host-uptime"
+                style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal; margin-left: 15px; border-left: 1px solid var(--border); padding-left: 15px;">
+            </div>
+        </h1>
         <div><a href="/api/logout" class="btn-logout">Encerrar Sessão</a></div>
     </div>
 
@@ -248,16 +298,42 @@
     <script>
         const fBytes = (b) => { if (!+b) return '0 B'; const k = 1024, i = Math.floor(Math.log(b) / Math.log(k)); return `${parseFloat((b / Math.pow(k, i)).toFixed(1))} ${['B', 'KB', 'MB', 'GB', 'TB'][i]}`; };
 
-        const draw = (id, data, color) => {
+        const formatUptime = (seconds) => {
+            const d = Math.floor(seconds / (3600 * 24));
+            const h = Math.floor(seconds % (3600 * 24) / 3600);
+            const m = Math.floor(seconds % 3600 / 60);
+            return `${d > 0 ? d + 'd ' : ''}${h}h ${m}m`;
+        };
+
+        const getDot = (val, type) => {
+            let color = 'dot-green';
+            if (type === 'cpu' || type === 'ram' || type === 'io') {
+                if (val >= 85) color = 'dot-red'; else if (val >= 70) color = 'dot-yellow';
+            } else if (type === 'storage') {
+                if (val >= 90) color = 'dot-red'; else if (val >= 80) color = 'dot-yellow';
+            } else if (type === 'swap') {
+                if (val >= 40) color = 'dot-red'; else if (val >= 10) color = 'dot-yellow';
+            } else if (type === 'net') {
+                if (val > 100) color = 'dot-yellow';
+            }
+            return `<div class="status-dot ${color}"></div>`;
+        };
+
+        const drawBg = (id, data, hexColor) => {
             const c = document.getElementById(id); if (!c) return;
-            const ctx = c.getContext('2d'), w = c.width, h = c.height, m = Math.max(...data, 1), s = w / Math.max((data.length - 1), 1);
+            const ctx = c.getContext('2d');
+            const w = c.clientWidth; const h = c.clientHeight;
+            c.width = w; c.height = h;
+
+            const m = Math.max(...data, 1);
+            const s = w / Math.max((data.length - 1), 1);
+
             ctx.clearRect(0, 0, w, h);
             ctx.beginPath(); ctx.moveTo(0, h);
             data.forEach((v, i) => ctx.lineTo(i * s, h - ((v / m) * h)));
-            ctx.lineTo(w, h); ctx.fillStyle = color + '33'; ctx.fill();
-            ctx.beginPath();
-            data.forEach((v, i) => { i === 0 ? ctx.moveTo(i * s, h - ((v / m) * h)) : ctx.lineTo(i * s, h - ((v / m) * h)); });
-            ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+            ctx.lineTo(w, h);
+            ctx.fillStyle = hexColor;
+            ctx.fill();
         };
 
         const update = async () => {
@@ -267,17 +343,75 @@
 
                 const d = await res.json(), h = d.host, n = d.network;
 
+                document.getElementById('host-uptime').innerHTML = `UPTIME DO SERVIDOR: <span style="color:#fff; font-family:var(--font-mono);">${formatUptime(h.uptime)}</span>`;
+
                 document.getElementById('host-stats').innerHTML = `
-                    <div class="stat-box"><div class="stat-lbl">RAM do Servidor</div><div class="stat-val">${h.ram_pct}%</div><div class="stat-sub">${fBytes(h.ram_used)} / ${fBytes(h.ram_tot)}</div></div>
-                    <div class="stat-box"><div class="stat-lbl">Armazenamento</div><div class="stat-val">${h.disk_pct}%</div><div class="stat-sub">${fBytes(h.disk_used)} / ${fBytes(h.disk_tot)}</div></div>
-                    <div class="stat-box"><div class="stat-lbl">CPU & Disk I/O</div><div class="stat-val">${h.cpu_pct}%</div><div class="stat-sub">I/O Load: ${h.io_pct}%</div></div>
-                    <div class="stat-box"><div class="stat-lbl">Download</div><div class="stat-val">${n.rx_mbps} MB/s</div><canvas id="grx" width="200" height="40" class="graph"></canvas></div>
-                    <div class="stat-box"><div class="stat-lbl">Upload</div><div class="stat-val">${n.tx_mbps} MB/s</div><canvas id="gtx" width="200" height="40" class="graph"></canvas></div>
+                    <div class="stat-box">
+                        ${getDot(h.cpu_pct, 'cpu')}
+                        <div class="stat-lbl">CPU</div>
+                        <div class="stat-val">${h.cpu_pct}% <span style="font-size:1rem; font-weight:normal; color:var(--text-muted);">${h.cpu_ghz}GHz</span></div>
+                        <div class="stat-sub">${h.cpu_cores} CORES / ${h.cpu_threads} THREADS</div>
+                        <canvas id="g-cpu" class="bg-graph"></canvas>
+                    </div>
+                    <div class="stat-box">
+                        ${getDot(h.ram_pct, 'ram')}
+                        <div class="stat-lbl">RAM</div>
+                        <div class="stat-val">${h.ram_pct}%</div>
+                        <div class="stat-sub">${fBytes(h.ram_used)} / ${fBytes(h.ram_tot)}</div>
+                        <canvas id="g-ram" class="bg-graph"></canvas>
+                    </div>
+                    <div class="stat-box">
+                        ${getDot(h.swap_pct, 'swap')}
+                        <div class="stat-lbl">SWAP MEMORY</div>
+                        <div class="stat-val">${h.swap_pct}%</div>
+                        <div class="stat-sub">${fBytes(h.swap_used)} / ${fBytes(h.swap_tot)}</div>
+                        <canvas id="g-swap" class="bg-graph"></canvas>
+                    </div>
+                    <div class="stat-box">
+                        ${getDot(h.disk_pct, 'storage')}
+                        <div class="stat-lbl">ARMAZENAMENTO</div>
+                        <div class="stat-val">${(100 - h.disk_pct).toFixed(1)}% LIVRE</div>
+                        <div class="stat-sub">${fBytes(h.disk_tot - h.disk_used)} / ${fBytes(h.disk_tot)}</div>
+                        <canvas id="g-disk" class="bg-graph"></canvas>
+                    </div>
+                    <div class="stat-box">
+                        ${getDot(h.io_pct, 'io')}
+                        <div class="stat-lbl">DISCOS</div>
+                        <div class="stat-val">${h.io_pct}% <span style="font-size:0.8rem; font-weight:normal; color:var(--text-muted);">< SIS</span></div>
+                        <div class="stat-sub">TOTAL: ${h.total_disks} DISCOS</div>
+                        <canvas id="g-io" class="bg-graph"></canvas>
+                    </div>
+                    <div class="stat-box">
+                        ${getDot(n.rx_mbps, 'net')}
+                        <div class="stat-lbl">DOWN</div>
+                        <div class="stat-val">${n.rx_mbps} MB/s</div>
+                        <div class="stat-sub">MÉDIA DOS ÚLTIMOS 60s</div>
+                        <canvas id="g-rx" class="bg-graph"></canvas>
+                    </div>
+                    <div class="stat-box">
+                        ${getDot(n.tx_mbps, 'net')}
+                        <div class="stat-lbl">UP</div>
+                        <div class="stat-val">${n.tx_mbps} MB/s</div>
+                        <div class="stat-sub">MÉDIA DOS ÚLTIMOS 60s</div>
+                        <canvas id="g-tx" class="bg-graph"></canvas>
+                    </div>
+                    <div class="stat-box">
+                        ${getDot(h.gpu_pct, 'gpu')}
+                        <div class="stat-lbl">GPU</div>
+                        <div class="stat-val">${h.gpu_pct}% USO <span style="font-size:1rem; font-weight:normal; color:var(--text-muted);">${h.gpu_ram_gb} GB</span></div>
+                        <div class="stat-sub">${h.gpu_brand}</div>
+                        <canvas id="g-gpu" class="bg-graph"></canvas>
+                    </div>
                 `;
 
-                // O front desenha o gráfico lendo diretamente o histórico guardado na memória do Backend
-                draw('grx', n.history_rx, '#3b82f6');
-                draw('gtx', n.history_tx, '#10b981');
+                drawBg('g-cpu', h.history_cpu, '#3b82f6');
+                drawBg('g-ram', h.history_ram, '#8b5cf6');
+                drawBg('g-swap', h.history_swap, '#f59e0b');
+                drawBg('g-disk', h.history_disk, '#64748b');
+                drawBg('g-io', h.history_io, '#ef4444');
+                drawBg('g-rx', n.history_rx, '#10b981');
+                drawBg('g-tx', n.history_tx, '#14b8a6');
+                drawBg('g-gpu', h.history_gpu, '#0ea5e9');
 
                 let phtml = '';
                 for (const [pn, p] of Object.entries(d.projects)) {
@@ -287,8 +421,18 @@
                         if (!items.length) return ''; let g = `<div class="group-title">${t}</div><div class="grid">`;
                         items.sort((a, b) => a.name.localeCompare(b.name)).forEach(c => {
                             const u = c.state === 'running';
-                            let tg = c.domains.map(d => `<span class="tag domain">🔗 ${d}</span>`).join('') + c.ports.map(p => `<span class="tag">🔌 ${p}</span>`).join('');
-                            g += `<div class="card ${u ? '' : 'offline'}"><div class="c-head"><div class="c-name">${c.name}</div><div style="color:${u ? 'var(--online)' : 'var(--offline)'}; font-size:0.7rem; font-weight:bold;">${c.state.toUpperCase()}</div></div><div class="c-img" title="${c.image}">${c.image}</div>${tg ? `<div class="tag-list">${tg}</div>` : ''}<div class="c-foot"><span>CPU: ${u ? c.cpu + '%' : '0%'}</span><span>RAM: ${u ? fBytes(c.ram) : '0 B'}</span></div></div>`;
+                            let tg = c.domains.map(d => `<a href="https://${d}" target="_blank" class="tag domain">🔗 ${d}</a>`).join('') + c.ports.map(p => `<span class="tag">🔌 ${p}</span>`).join('');
+
+                            g += `<div class="card ${u ? '' : 'offline'}">
+                                <div class="c-head"><div class="c-name">${c.name}</div><div style="color:${u ? 'var(--online)' : 'var(--offline)'}; font-size:0.7rem; font-weight:bold;">${c.state.toUpperCase()}</div></div>
+                                <div class="c-img" title="${c.image}">${c.image}</div>
+                                ${tg ? `<div class="tag-list">${tg}</div>` : ''}
+                                <div class="c-foot">
+                                    <span>CPU: ${u ? c.cpu + '%' : '0%'}</span>
+                                    <span>RAM: ${u ? fBytes(c.ram) : '0 B'}</span>
+                                    <span style="color:var(--text-muted);" title="Uptime">${c.uptime}</span>
+                                </div>
+                            </div>`;
                         }); return g + `</div>`;
                     };
                     phtml += rG('🗄️ Bancos de Dados', p.banco) + rG('🚀 Frontend & Proxies', p.front) + rG('🔒 Backend & APIs', p.back) + `</div>`;
