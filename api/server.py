@@ -3,22 +3,37 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from http import cookies
 from collections import deque
 
-USER = os.getenv("DOCOPS_USER", "admin")
-PASS = os.getenv("DOCOPS_PASS", "admin")
+USER = os.getenv("DOCOPS_USER", "admin").strip()
+PASS = os.getenv("DOCOPS_PASS", "admin").strip()
 SESSIONS = set()
 
-# Histórico Circular de 1 hora (1800 pontos com intervalo de 2s) - Tamanho Máx na RAM: ~100 KB
-HISTORY_RX = deque([0] * 30, maxlen=1800) 
-HISTORY_TX = deque([0] * 30, maxlen=1800)
+# Buffers Circulares (60 segundos = 30 pontos de 2s)
+HISTORY_RX = deque([0] * 30, maxlen=30) 
+HISTORY_TX = deque([0] * 30, maxlen=30)
+HISTORY_CPU = deque([0] * 30, maxlen=30)
+HISTORY_RAM = deque([0] * 30, maxlen=30)
+HISTORY_SWAP = deque([0] * 30, maxlen=30)
+HISTORY_DISK = deque([0] * 30, maxlen=30)
+HISTORY_IO = deque([0] * 30, maxlen=30)
+HISTORY_GPU = deque([0] * 30, maxlen=30)
 
 STATE = {
-    "host": {"cpu_pct": 0, "ram_pct": 0, "ram_used": 0, "ram_tot": 0, "disk_pct": 0, "disk_used": 0, "disk_tot": 0, "io_pct": 0, "ct_on": 0, "ct_tot": 0},
-    "network": {"rx_mbps": 0, "tx_mbps": 0, "history_rx": [], "history_tx": []}, 
+    "host": {
+        "uptime": 0,
+        "cpu_pct": 0.0, "cpu_ghz": 0.0, "cpu_cores": 0, "cpu_threads": 0,
+        "ram_pct": 0, "ram_used": 0, "ram_tot": 0, 
+        "swap_pct": 0, "swap_used": 0, "swap_tot": 0,
+        "disk_pct": 0, "disk_used": 0, "disk_tot": 0, "io_pct": 0, "total_disks": 0,
+        "gpu_pct": 0, "gpu_ram_gb": 0, "gpu_brand": "N/A"
+    },
+    "network": {"rx_mbps": 0, "tx_mbps": 0}, 
     "projects": {}
 }
 
 LAST_NET = {"rx": 0, "tx": 0, "time": time.time()}
 LAST_IO = {"ticks": 0, "time": time.time()}
+LAST_CPU = {"idle": 0, "total": 0}
+FIRST_RUN = True
 
 def req_docker(path):
     try:
@@ -36,18 +51,53 @@ def req_docker(path):
     return None
 
 def monitor_loop():
-    global LAST_NET, LAST_IO
+    global LAST_NET, LAST_IO, LAST_CPU, FIRST_RUN
     
     while True:
         now = time.time()
         dt = now - LAST_NET["time"] if (now - LAST_NET["time"]) > 0 else 1
 
         try:
+            with open('/host/proc/uptime') as f: STATE["host"]["uptime"] = float(f.read().split()[0])
+        except: pass
+
+        try:
+            cores = set(); threads = 0; freq = 0.0
+            with open('/host/proc/cpuinfo') as f:
+                for line in f:
+                    if line.startswith('processor'): threads += 1
+                    elif line.startswith('core id'): cores.add(line.split(':')[1].strip())
+                    elif line.startswith('cpu MHz') and freq == 0.0: freq = float(line.split(':')[1].strip()) / 1000.0
+            STATE["host"]["cpu_threads"] = threads
+            STATE["host"]["cpu_cores"] = len(cores) if len(cores) > 0 else threads
+            if freq > 0: STATE["host"]["cpu_ghz"] = round(freq, 2)
+        except: pass
+
+        try:
+            with open('/host/proc/stat') as f:
+                cpu_line = f.readline().split()
+                idle = float(cpu_line[4]) + float(cpu_line[5])
+                total = sum(float(x) for x in cpu_line[1:9])
+                idle_delta = idle - LAST_CPU["idle"]
+                total_delta = total - LAST_CPU["total"]
+                if not FIRST_RUN and total_delta > 0:
+                    STATE["host"]["cpu_pct"] = round(100.0 * (1.0 - (idle_delta / total_delta)), 1)
+                LAST_CPU["idle"] = idle; LAST_CPU["total"] = total
+        except: pass
+
+        try:
             with open('/host/proc/meminfo') as f: mem = {l.split(':')[0]: int(l.split()[1]) for l in f}
-            STATE["host"]["ram_tot"] = mem['MemTotal'] * 1024
-            STATE["host"]["ram_used"] = STATE["host"]["ram_tot"] - (mem['MemAvailable'] * 1024)
-            STATE["host"]["ram_pct"] = round((STATE["host"]["ram_used"] / STATE["host"]["ram_tot"]) * 100, 1)
-            with open('/host/proc/loadavg') as f: STATE["host"]["cpu_pct"] = min(round((float(f.read().split()[0]) / (os.cpu_count() or 1)) * 100, 1), 100.0)
+            STATE["host"]["ram_tot"] = mem.get('MemTotal', 0) * 1024
+            STATE["host"]["ram_used"] = STATE["host"]["ram_tot"] - (mem.get('MemAvailable', 0) * 1024)
+            STATE["host"]["ram_pct"] = round((STATE["host"]["ram_used"] / STATE["host"]["ram_tot"]) * 100, 1) if STATE["host"]["ram_tot"] > 0 else 0
+            
+            STATE["host"]["swap_tot"] = mem.get('SwapTotal', 0) * 1024
+            STATE["host"]["swap_free"] = mem.get('SwapFree', 0) * 1024
+            STATE["host"]["swap_used"] = STATE["host"]["swap_tot"] - STATE["host"]["swap_free"]
+            STATE["host"]["swap_pct"] = round((STATE["host"]["swap_used"] / STATE["host"]["swap_tot"]) * 100, 1) if STATE["host"]["swap_tot"] > 0 else 0
+        except: pass
+
+        try:
             st = os.statvfs('/host/root')
             STATE["host"]["disk_tot"] = st.f_blocks * st.f_frsize
             STATE["host"]["disk_used"] = (st.f_blocks - st.f_bavail) * st.f_frsize
@@ -55,15 +105,21 @@ def monitor_loop():
         except: pass
 
         try:
+            disks = 0
+            for dev in os.listdir('/host/sys/block'):
+                if not dev.startswith('loop') and not dev.startswith('ram'): disks += 1
+            STATE["host"]["total_disks"] = disks
+
             with open('/host/proc/diskstats') as f:
                 for line in f:
                     parts = line.split()
                     if parts[2] in ['sda', 'vda', 'nvme0n1']:
-                        ticks = int(parts[12])
-                        dt_io = now - LAST_IO["time"]
-                        if dt_io > 0:
-                            STATE["host"]["io_pct"] = min(round(max(0, ((ticks - LAST_IO["ticks"]) / (dt_io * 1000)) * 100), 1), 100.0)
-                            LAST_IO = {"ticks": ticks, "time": now}
+                        io_ms = int(parts[12])
+                        dt_io_ms = (now - LAST_IO["time"]) * 1000
+                        if not FIRST_RUN and dt_io_ms > 0:
+                            util = ((io_ms - LAST_IO["ticks"]) / dt_io_ms) * 100
+                            STATE["host"]["io_pct"] = min(round(max(0, util), 1), 100.0)
+                        LAST_IO = {"ticks": io_ms, "time": now}
                         break
         except: pass
 
@@ -78,17 +134,32 @@ def monitor_loop():
             rx_mbps = round(((rx - LAST_NET["rx"]) / 1024 / 1024) / dt, 2) if LAST_NET["rx"] > 0 else 0
             tx_mbps = round(((tx - LAST_NET["tx"]) / 1024 / 1024) / dt, 2) if LAST_NET["tx"] > 0 else 0
             
-            STATE["network"]["rx_mbps"] = rx_mbps
-            STATE["network"]["tx_mbps"] = tx_mbps
+            if not FIRST_RUN:
+                STATE["network"]["rx_mbps"] = rx_mbps
+                STATE["network"]["tx_mbps"] = tx_mbps
             LAST_NET.update({"rx": rx, "tx": tx, "time": now})
-            
-            # Alimenta o Buffer Circular
-            HISTORY_RX.append(rx_mbps)
-            HISTORY_TX.append(tx_mbps)
-            STATE["network"]["history_rx"] = list(HISTORY_RX)
-            STATE["network"]["history_tx"] = list(HISTORY_TX)
-            
         except: pass
+
+        try:
+            if os.path.exists('/host/sys/class/drm/card0/device/vendor'):
+                with open('/host/sys/class/drm/card0/device/vendor') as f:
+                    vendor = f.read().strip()
+                    if '0x1002' in vendor: STATE["host"]["gpu_brand"] = "AMD Radeon"
+                    elif '0x8086' in vendor: STATE["host"]["gpu_brand"] = "Intel Graphics"
+                    elif '0x10de' in vendor: STATE["host"]["gpu_brand"] = "NVIDIA"
+        except: pass
+
+        if not FIRST_RUN:
+            HISTORY_CPU.append(STATE["host"]["cpu_pct"]); STATE["host"]["history_cpu"] = list(HISTORY_CPU)
+            HISTORY_RAM.append(STATE["host"]["ram_pct"]); STATE["host"]["history_ram"] = list(HISTORY_RAM)
+            HISTORY_SWAP.append(STATE["host"]["swap_pct"]); STATE["host"]["history_swap"] = list(HISTORY_SWAP)
+            HISTORY_DISK.append(STATE["host"]["disk_pct"]); STATE["host"]["history_disk"] = list(HISTORY_DISK)
+            HISTORY_IO.append(STATE["host"]["io_pct"]); STATE["host"]["history_io"] = list(HISTORY_IO)
+            HISTORY_GPU.append(STATE["host"]["gpu_pct"]); STATE["host"]["history_gpu"] = list(HISTORY_GPU)
+            HISTORY_RX.append(STATE["network"]["rx_mbps"]); STATE["network"]["history_rx"] = list(HISTORY_RX)
+            HISTORY_TX.append(STATE["network"]["tx_mbps"]); STATE["network"]["history_tx"] = list(HISTORY_TX)
+
+        FIRST_RUN = False
 
         containers = req_docker('/containers/json?all=1') or []
         projects = {}
@@ -99,12 +170,14 @@ def monitor_loop():
             
             name = c['Names'][0].lstrip('/')
             state = c['State']
+            uptime_str = c.get('Status', 'N/A')
             ports = [f"{p['PublicPort']}:{p['PrivatePort']}" for p in c.get('Ports', []) if 'PublicPort' in p]
             domains = [v.split("Host(`")[1].split("`)")[0] for k, v in labels.items() if k.startswith('traefik.http.routers.') and '.rule' in k and "Host(`" in v]
 
             c_type = 'back'
-            if any(x in c['Image'].lower() for x in ['postgres', 'mysql', 'mariadb', 'redis', 'mongo']): c_type = 'banco'
-            elif any(x in c['Image'].lower() for x in ['frontend', 'ui', 'viewer', 'web', 'nginx', 'apache', 'portal']): c_type = 'front'
+            img_lower = c['Image'].lower()
+            if any(x in img_lower for x in ['postgres', 'mysql', 'mariadb', 'redis', 'mongo', 'pgvector']): c_type = 'banco'
+            elif any(x in img_lower for x in ['frontend', 'ui', 'viewer', 'web', 'nginx', 'apache', 'portal']) or len(domains) > 0: c_type = 'front'
 
             cpu = 0; ram = 0; n_rx = 0; n_tx = 0; blk_io = 0
             if state == 'running':
@@ -124,7 +197,7 @@ def monitor_loop():
             projects[proj]["stats"]["net_rx"] += n_rx
             projects[proj]["stats"]["net_tx"] += n_tx
             projects[proj]["stats"]["io_rw"] += blk_io
-            projects[proj][c_type].append({"name": name, "image": c['Image'], "state": state, "ports": ports, "domains": domains, "cpu": round(cpu, 1), "ram": ram})
+            projects[proj][c_type].append({"name": name, "image": c['Image'], "state": state, "uptime": uptime_str, "ports": ports, "domains": domains, "cpu": round(cpu, 1), "ram": ram})
 
         STATE["projects"] = projects
         time.sleep(2)
@@ -139,46 +212,28 @@ class APIHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == '/api/data':
             if not self.check_auth():
-                self.send_response(401)
-                self.end_headers()
-                return
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.end_headers()
+                self.send_response(401); self.end_headers(); return
+            self.send_response(200); self.send_header('Content-Type', 'application/json'); self.end_headers()
             self.wfile.write(json.dumps(STATE).encode('utf-8'))
         elif self.path == '/api/logout':
             if "Cookie" in self.headers:
                 C = cookies.SimpleCookie(self.headers["Cookie"])
-                if "docops_session" in C and C["docops_session"].value in SESSIONS:
-                    SESSIONS.remove(C["docops_session"].value)
-            self.send_response(302)
-            self.send_header('Set-Cookie', 'docops_session=; HttpOnly; Path=/; Max-Age=0')
-            self.send_header('Location', '/login.html')
-            self.end_headers()
+                if "docops_session" in C and C["docops_session"].value in SESSIONS: SESSIONS.remove(C["docops_session"].value)
+            self.send_response(302); self.send_header('Set-Cookie', 'docops_session=; HttpOnly; Path=/; Max-Age=0'); self.send_header('Location', '/login.html'); self.end_headers()
         else:
-            self.send_response(404)
-            self.end_headers()
+            self.send_response(404); self.end_headers()
 
     def do_POST(self):
         if self.path == '/api/login':
             length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(length).decode()
             data = urllib.parse.parse_qs(body)
-            u = data.get('user', [''])[0]
-            p = data.get('pass', [''])[0]
-            
+            u = data.get('user', [''])[0].strip(); p = data.get('pass', [''])[0].strip()
             if u == USER and p == PASS:
-                token = secrets.token_hex(32)
-                SESSIONS.add(token)
-                self.send_response(302)
-                self.send_header('Set-Cookie', f'docops_session={token}; HttpOnly; Path=/')
-                self.send_header('Location', '/')
-                self.end_headers()
+                token = secrets.token_hex(32); SESSIONS.add(token)
+                self.send_response(302); self.send_header('Set-Cookie', f'docops_session={token}; HttpOnly; Path=/'); self.send_header('Location', '/'); self.end_headers()
             else:
-                self.send_response(302)
-                self.send_header('Location', '/login.html')
-                self.end_headers()
-
+                self.send_response(302); self.send_header('Location', '/login.html?error=1'); self.end_headers()
     def log_message(self, format, *args): pass
 
 if __name__ == '__main__':
