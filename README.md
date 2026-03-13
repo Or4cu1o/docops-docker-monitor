@@ -31,6 +31,12 @@ O **DocOps** é um painel de telemetria simples e eficiente para servidores Linu
 - **Rede:** Exposição de portas públicas e mapeamentos internos.
 - **Serviços Críticos:** Identificação e monitoramento especializado para **Pi-hole** e serviços de DNS/Infraestrutura.
 
+### 🖼️ Screenshots
+
+![DocOps Screenshot 1](./public/screenshots/screenshot-01.png)
+
+![DocOps Screenshot 2](./public/screenshots/screenshot-02.png)
+
 ## 🚀 Como Executar
 
 ### Pré-requisitos
