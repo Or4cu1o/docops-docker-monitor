@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <title>DocOps | Security Access</title>
-    <link rel="icon" type="image/x-icon" href="/assets/favicon.png">
+    <link rel="icon" type="image/png" href="/assets/favicon.png">
     <style>
         body {
             background: #09090b;
@@ -60,20 +60,43 @@
         button:hover {
             background: #2563eb;
         }
+
+        #error-box {
+            display: none;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
     </style>
 </head>
 
 <body>
     <div class="box">
-        <img src="/assets/logo.png" alt="DocOps Logo" class="logo" onerror="this.style.display='none'">
+        <img src="/assets/logo.svg" alt="DocOps Logo" class="logo"
+            onerror="this.onerror=null; this.src='/assets/logo.png'">
         <h2>🐋 DocOps Login</h2>
-        <p style="color:#a1a1aa; font-size:0.9rem; margin-bottom:30px;">Autenticação Requerida</p>
+        <p style="color:#a1a1aa; font-size:0.9rem; margin-bottom:20px;">Autenticação Requerida</p>
+
+        <div id="error-box">Acesso Negado: Credenciais Incorretas</div>
+
         <form method="POST" action="/api/login">
             <input type="text" name="user" placeholder="Usuário" required>
             <input type="password" name="pass" placeholder="Senha" required>
             <button type="submit">Autenticar Sistema</button>
         </form>
     </div>
+
+    <script>
+        if (window.location.search.includes('error=1')) {
+            document.getElementById('error-box').style.display = 'block';
+            window.history.replaceState({}, document.title, "/login.html");
+        }
+    </script>
 </body>
 
 </html>
