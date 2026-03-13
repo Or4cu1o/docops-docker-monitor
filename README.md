@@ -1,11 +1,10 @@
 # 🐋 DocOps - Docker Monitor for DevOps
 
 [![Build and Publish](https://github.com/or4cu1o/docops-docker-monitor/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/or4cu1o/docops-docker-monitor/actions)
-[![Build images](https://github.com/or4cu1o/docops-docker-monitor/actions/workflows/docker-publish.yml/badge.svg?branch=main&event=push)](https://github.com/or4cu1o/docops-docker-monitor/actions/workflows/docker-publish.yml)
 [![Docker Pulls](https://img.shields.io/docker/pulls/or4cu1o/docops.svg)](https://hub.docker.com/r/or4cu1o/docops)
 [![Language](https://img.shields.io/badge/Language-Python-blue.svg)](https://www.python.org/)
 
-![DocOps Banner](./public/assets/banner.png)
+![DocOps Banner](https://raw.githubusercontent.com/or4cu1o/docops-docker-monitor/main/public/assets/banner.png)
 
 O **DocOps** é um painel de telemetria simples e eficiente para servidores Linux e infraestruturas Docker. Desenvolvido para entregar visibilidade de borda com latência zero, consumo de recursos insignificante e uma arquitetura de segurança inviolável.
 
@@ -33,9 +32,9 @@ O **DocOps** é um painel de telemetria simples e eficiente para servidores Linu
 
 ### 🖼️ Screenshots
 
-![DocOps Screenshot 1](./public/screenshots/screenshot-01.png)
+![DocOps Screenshot 1](https://raw.githubusercontent.com/or4cu1o/docops-docker-monitor/main/public/screenshots/screenshot-01.png)
 
-![DocOps Screenshot 2](./public/screenshots/screenshot-02.png)
+![DocOps Screenshot 2](https://raw.githubusercontent.com/or4cu1o/docops-docker-monitor/main/public/screenshots/screenshot-02.png)
 
 ## 🚀 Como Executar
 
