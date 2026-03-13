@@ -1,0 +1,23 @@
+name: Sync README to Docker Hub
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'README.md'
+
+jobs:
+  sync-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Sync README
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          repository: or4cu1o/docops
+          short-description: "Docker Monitor for DevOps."
+          readme-filepath: ./README.md
